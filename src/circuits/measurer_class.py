@@ -43,7 +43,7 @@ class CircuitMeasurer:
         for i in range(2**self.n_qubits):
             bitstr = format(i, f'0{self.n_qubits}b')
             circuit = qiskit.QuantumCircuit(self.n_qubits, self.n_qubits)
-            for q, b in enumerate(bitstr):
+            for q, b in enumerate(bitstr[::-1]):
                 if b == '1':
                     circuit.x(q)
             for q in range(self.n_qubits):
@@ -59,16 +59,21 @@ class CircuitMeasurer:
         for j, _ in enumerate(labels):
             counts = results.get_counts(j)
             total = sum(counts.values())
+            if total == 0: raise ValueError(f"MEM calibration circuit {j} has zero total counts")
             for k, v in counts.items():
                 idx = int(k, 2)
                 matrix[idx, j] = v / total
+
         self.MEM_matrix = matrix
         self.MEM = True
 
     def add_SV(self, allowed_states : list[str]):
         if not isinstance(allowed_states, list): raise TypeError(f"The allowed states must be given as a list of the strings of the state, you have entered a {type(allowed_states)}")
         for state in allowed_states:
+            if not isinstance(state, str): raise TypeError(f"Allowed states must be strings, you have entered a {type(state)}")
             if not len(state) == self.n_qubits: raise ValueError(f"Allowed states must be over the same number (currently {len(state)}) of qubits as the circuit ({self.n_qubits})")
+            for bit in state:
+                if bit not in ['0', '1']: raise ValueError(f"Allowed states must only contain 0s and 1s, you entered state = {state}")
 
         self.SV_allowed_states = allowed_states
         self.SV = True
@@ -76,11 +81,12 @@ class CircuitMeasurer:
     def global_fold_circuit(self, scale_factor : int):
         if not isinstance(scale_factor, int): raise TypeError(f"The scale_factor must be an integer, you have entered a {type(scale_factor)}")
 
-        if scale_factor < 0: raise ValueError(f"The scale_factor must be greater than or equal to 1, you entered scale_factor = {scale_factor}")
+        if scale_factor < 0: raise ValueError(f"The scale_factor must be greater than or equal to 0, you entered scale_factor = {scale_factor}")
         
         circuit_copy = copy(self.parametrized_circuit)
         if scale_factor == 0:
             return circuit_copy
+
         folded_circuit = circuit_copy.copy()
         inverse_circuit = circuit_copy.inverse()
 
@@ -92,13 +98,18 @@ class CircuitMeasurer:
 
     def apply_MEM_filter(self, counts : dict):
         if not isinstance(counts, dict): raise TypeError(f"The counts must be a dict, you have entered a {type(counts)}")
+        if self.MEM_matrix is None: raise ValueError(f"MEM matrix has not been built, call build_MEM first")
 
         n = 2**self.n_qubits
         p_meas = np.zeros(n)
         for bit, c in counts.items():
             idx = int(bit, 2)
             p_meas[idx] = c
-        p_meas /= p_meas.sum()
+
+        total_shots = sum(counts.values())
+        if total_shots == 0: raise ValueError(f"The counts dictionary has zero total counts")
+
+        p_meas /= total_shots
 
         try:
             p_true = np.linalg.solve(self.MEM_matrix, p_meas)
@@ -106,18 +117,31 @@ class CircuitMeasurer:
             p_true = np.linalg.lstsq(self.MEM_matrix, p_meas, rcond = None)[0]
 
         corrected_counts = {}
-        total_shots = sum(counts.values())
         for i, p in enumerate(p_true):
-            corrected_counts[format(i, f'0{self.n_qubits}b')] = max(p * total_shots, 0.0)
+            corrected_counts[format(i, f'0{self.n_qubits}b')] = max(p, 0.0)
+
+        corrected_total = sum(corrected_counts.values())
+        if corrected_total == 0: raise ValueError(f"MEM correction has produced zero total probability")
+
+        for state in corrected_counts:
+            corrected_counts[state] *= total_shots / corrected_total
+
         return corrected_counts
     
     def apply_SV_filter(self, counts : dict):
         if not isinstance(counts, dict): raise TypeError(f"The counts must be a dict, you have entered a {type(counts)}")
+        if self.SV_allowed_states is None: raise ValueError(f"SV allowed states have not been added, call add_SV first")
+
         corrected_counts = {}
 
+        total_before = sum(counts.values())
         for state in counts:
             if state in self.SV_allowed_states:
                 corrected_counts[state] = counts[state]
+
+        total_after = sum(corrected_counts.values())
+        # print(f"SV acceptance rate = {total_after / total_before}")
+
         return corrected_counts
 
     def change_hamiltonian(self, new_hamiltonian : Hamiltonian):
@@ -204,21 +228,41 @@ class CircuitMeasurer:
                 expected_value += self.hamiltonian.terms[term] * self.expected_value_pauli_term(term)
         return expected_value
     
-    def ZNE_expected_value_hamiltonian(self, max_scale_factor : int):
-        if not isinstance(max_scale_factor, int): raise TypeError(f"The scale_factor must be an integer, you have entered a {type(scale_factor)}")
+    def expected_value_hamiltonian_selective_SV(self):
+        expected_value = 0
+
+        old_SV = copy(self.SV)
+
+        for term in self.hamiltonian.terms:
+            if term == 'I'*self.n_qubits:
+                expected_value += self.hamiltonian.terms[term]
+            else:
+                if 'X' in term or 'Y' in term:
+                    self.SV = False
+                else:
+                    self.SV = old_SV
+
+                expected_value += self.hamiltonian.terms[term] * self.expected_value_pauli_term(term)
+
+        self.SV = old_SV
+
+        return expected_value
+    
+    def ZNE_expected_value_hamiltonian(self, max_scale_factor : int = 3):
+        if not isinstance(max_scale_factor, int): raise TypeError(f"The scale_factor must be an integer, you have entered a {type(max_scale_factor)}")
 
         if max_scale_factor < 0: raise ValueError(f"The scale_factor must be greater than or equal to 1, you entered scale_factor = {max_scale_factor}")
         
         if max_scale_factor == 0: 
             print(f"Warning! You have requested no folding, the original circuit will be returned")
-            return self.expected_value_hamiltonian()
+            return self.expected_value_hamiltonian_selective_SV()
         circuit_copy = copy(self.parametrized_circuit)
         scale_factors = list(range(max_scale_factor))
         values = []
         for lam in scale_factors:
             self.parametrized_circuit = circuit_copy
             self.parametrized_circuit = self.global_fold_circuit(lam)
-            values.append(self.expected_value_hamiltonian())
+            values.append(self.expected_value_hamiltonian_selective_SV())
 
         scale_factors_2 = [2 * lam + 1 for lam in scale_factors]
         self.parametrized_circuit = circuit_copy
@@ -237,3 +281,89 @@ class CircuitMeasurer:
         circuit_copy = self.parametrized_circuit.copy()
         psi = qiskit.quantum_info.Statevector.from_instruction(circuit_copy)
         return np.real(psi.expectation_value(operator))
+    
+    def term_fits_basis(self, term : str, basis : str):
+        if not isinstance(term, str): raise TypeError(f"The term must be given as a string, you have entered a {type(term)}")
+        if not isinstance(basis, str): raise TypeError(f"The basis must be given as a string, you have entered a {type(basis)}")
+
+        if not len(term) == self.n_qubits: raise ValueError(f"The term must be of the same length (currently {len(term)}) as the number of qubits in the circuit ({self.n_qubits})")
+        if not len(basis) == self.n_qubits: raise ValueError(f"The basis must be of the same length (currently {len(basis)}) as the number of qubits in the circuit ({self.n_qubits})")
+
+        self.hamiltonian.valid_term_check(term)
+        self.hamiltonian.valid_term_check(basis)
+
+        for j in range(self.n_qubits):
+            if term[j] != 'I' and basis[j] != 'I' and term[j] != basis[j]:
+                return False
+
+        return True
+    
+    def merge_term_into_basis(self, term : str, basis : str):
+        if not isinstance(term, str): raise TypeError(f"The term must be given as a string, you have entered a {type(term)}")
+        if not isinstance(basis, str): raise TypeError(f"The basis must be given as a string, you have entered a {type(basis)}")
+
+        if not self.term_fits_basis(term, basis): raise ValueError(f"The term = {term} does not fit into basis = {basis}")
+
+        new_basis = ""
+        for j in range(self.n_qubits):
+            if basis[j] == 'I':
+                new_basis += term[j]
+            else:
+                new_basis += basis[j]
+
+        return new_basis
+    
+    def group_terms_by_basis(self):
+        groups = []
+
+        for term in self.hamiltonian.terms:
+            if term == 'I'*self.n_qubits:
+                continue
+
+            placed = False
+            for group in groups:
+                if self.term_fits_basis(term, group['basis']):
+                    group['basis'] = self.merge_term_into_basis(term, group['basis'])
+                    group['terms'].append(term)
+                    placed = True
+                    break
+
+            if not placed:
+                groups.append({
+                    'basis': term,
+                    'terms': [term]
+                })
+
+        return groups
+    
+    def expected_value_hamiltonian_grouped_selective_SV(self):
+        expected_value = 0
+
+        old_SV = copy(self.SV)
+        groups = self.group_terms_by_basis()
+
+        for term in self.hamiltonian.terms:
+            if term == 'I'*self.n_qubits:
+                expected_value += self.hamiltonian.terms[term]
+
+        for group in groups:
+            basis = group['basis']
+
+            if 'X' in basis or 'Y' in basis:
+                self.SV = False
+            else:
+                self.SV = old_SV
+
+            counts = self.measure_value_basis(basis)
+
+            if self.MEM:
+                counts = self.apply_MEM_filter(counts)
+            if self.SV:
+                counts = self.apply_SV_filter(counts)
+
+            for term in group['terms']:
+                expected_value += self.hamiltonian.terms[term] * self.expected_value_from_counts(counts, term)
+
+        self.SV = old_SV
+
+        return expected_value

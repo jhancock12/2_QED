@@ -1,4 +1,5 @@
 # Standard libraries
+from copy import copy
 
 # Local modules
 from observables import qed_hamiltonian
@@ -19,7 +20,16 @@ def full_runner(lattice_parameters, qed_parameters, vqe_parameters, SPSA_paramet
                     lattice_parameters['n_g'], lattice_parameters['dynamical_links_list'], 
                     lattice_parameters['charge_site'], lattice_parameters['anticharge_site'], 
                     lattice_parameters['background_field'])
-    hamiltonian = qed_hamiltonian(qed_parameters, lattice)
+    hamiltonian = qed_hamiltonian(qed_parameters, lattice, mass_multi = 1, electric_multi = 1, magnetic_multi = 1, kinetic_multi = 1)
+
+    hamiltonian_electric = qed_hamiltonian(qed_parameters, lattice, mass_multi = 0, electric_multi = 1, magnetic_multi = 0, kinetic_multi = 0)
+    hamiltonian_magnetic = qed_hamiltonian(qed_parameters, lattice, mass_multi = 1, electric_multi = 0, magnetic_multi = 0, kinetic_multi = 0)
+    hamiltonian_mass = qed_hamiltonian(qed_parameters, lattice, mass_multi = 0, electric_multi = 0, magnetic_multi = 1, kinetic_multi = 0)
+    hamiltonian_kinetic = qed_hamiltonian(qed_parameters, lattice, mass_multi = 0, electric_multi = 0, magnetic_multi = 0, kinetic_multi = 1)
+
+    hamiltonians = [hamiltonian, hamiltonian_mass, hamiltonian_electric, hamiltonian_magnetic, hamiltonian_kinetic]
+    hamiltonian_names = ["full", "mass", "electric", "magnetic", "kinetic"]
+
     circuit_class = CircuitForLattice(lattice, vqe_parameters['n_fermion_layers'])
     # -------------------------------
     fake_backend = FakeCairoV2()
@@ -42,10 +52,18 @@ def full_runner(lattice_parameters, qed_parameters, vqe_parameters, SPSA_paramet
     # -------------------------------
     measurer_classes = [measurer_noiseless, measurer_noisy, measurer_noisy_mem_only, measurer_noisy_SV_only, measurer_noisy_all]
     names = ['No quantum noise', 'No QEM', 'MEM only', 'SV only', 'Both']
-    # -------------------------------
+
+    # measurer_classes = [measurer_noiseless, measurer_noisy, measurer_noisy_mem_only]
+    # names = ['No quantum noise', 'No QEM', 'MEM only']
+    # -------------------------------  
+    qed_parameters['charge_weight'] = 0.0
+    hamiltonian = qed_hamiltonian(qed_parameters, lattice)
+    results, final_thetas = solve_noiseless_sample_many(hamiltonian, lattice, vqe_parameters, SPSA_parameters, measurer_classes, names)
+    qed_parameters['charge_weight'] = 100.0
+    hamiltonian = qed_hamiltonian(qed_parameters, lattice)
     results_sparse = solve_and_observe_sparse(hamiltonian, lattice)
-    results = solve_noiseless_sample_many(hamiltonian, lattice, vqe_parameters, SPSA_parameters, measurer_classes, names)
     results['sparse'] = results_sparse
+    qed_parameters['charge_weight'] = 0.0
     for key in results:
         print(f"----- {key} -----")
         dict_print(results[key])

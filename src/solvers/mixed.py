@@ -25,9 +25,9 @@ def electric_field_values_noisy_local(lattice : Lattice, measurer_class : Circui
             hamiltonian = electric_n_direction(lattice, site_n, direction)
             measurer_class.change_hamiltonian(hamiltonian)
             if ZNE:
-                values[(lattice.labels[site_n], direction)] = measurer_class.ZNE_expected_value_hamiltonian(3)
+                values[(lattice.labels[site_n], direction)] = measurer_class.ZNE_expected_value_hamiltonian()
             else:
-                values[(lattice.labels[site_n], direction)] = measurer_class.expected_value_hamiltonian()
+                values[(lattice.labels[site_n], direction)] = measurer_class.expected_value_hamiltonian_selective_SV()
 
     return values
 
@@ -44,9 +44,9 @@ def electric_field_values_squared_noisy_local(lattice : Lattice, measurer_class 
             hamiltonian.multiply_by_hamiltonian(hamiltonian)
             measurer_class.change_hamiltonian(hamiltonian)
             if ZNE:
-                values[(lattice.labels[site_n], direction)] = measurer_class.ZNE_expected_value_hamiltonian(3)
+                values[(lattice.labels[site_n], direction)] = measurer_class.ZNE_expected_value_hamiltonian()
             else:
-                values[(lattice.labels[site_n], direction)] = measurer_class.expected_value_hamiltonian()
+                values[(lattice.labels[site_n], direction)] = measurer_class.expected_value_hamiltonian_selective_SV()
 
     return values
 
@@ -57,13 +57,18 @@ def magnetic_field_values_noisy_local(lattice : Lattice, measurer_class : Circui
     
     values = {}
 
+    old_SV = copy(measurer_class.SV)
+    measurer_class.SV = False
+
     for site_n in lattice.plaquettes:
         hamiltonian = magnetic_term_n(lattice, site_n)
         measurer_class.change_hamiltonian(hamiltonian)
         if ZNE:
-            values[lattice.labels[site_n]] = measurer_class.ZNE_expected_value_hamiltonian(3)
+            values[lattice.labels[site_n]] = measurer_class.ZNE_expected_value_hamiltonian()
         else:
-            values[lattice.labels[site_n]] = measurer_class.expected_value_hamiltonian()
+            values[lattice.labels[site_n]] = measurer_class.expected_value_hamiltonian_selective_SV()
+
+    measurer_class.SV = old_SV
 
     return values
     
@@ -78,9 +83,9 @@ def charge_values_noisy_local(lattice : Lattice, measurer_class : CircuitMeasure
         hamiltonian = charge_n_hamiltonian(lattice, site_n)
         measurer_class.change_hamiltonian(hamiltonian)
         if ZNE:
-            values[lattice.labels[site_n]] = measurer_class.ZNE_expected_value_hamiltonian(3)
+            values[lattice.labels[site_n]] = measurer_class.ZNE_expected_value_hamiltonian()
         else:
-            values[lattice.labels[site_n]] = measurer_class.expected_value_hamiltonian()
+            values[lattice.labels[site_n]] = measurer_class.expected_value_hamiltonian_selective_SV()
     
     return values
 
@@ -95,9 +100,9 @@ def particle_number_values_noisy_local(lattice : Lattice, measurer_class : Circu
         hamiltonian = particle_n_hamiltonian(lattice, site_n)
         measurer_class.change_hamiltonian(hamiltonian)
         if ZNE:
-            values[lattice.labels[site_n]] = measurer_class.ZNE_expected_value_hamiltonian(3)
+            values[lattice.labels[site_n]] = measurer_class.ZNE_expected_value_hamiltonian()
         else:
-            values[lattice.labels[site_n]] = measurer_class.expected_value_hamiltonian()
+            values[lattice.labels[site_n]] = measurer_class.expected_value_hamiltonian_selective_SV()
     
     return values
 
@@ -205,10 +210,10 @@ def solve_noiseless_sample_many(hamiltonian : Hamiltonian, lattice : Lattice, vq
         observe_results = observes_reduced_noisy_local(results['final_paras'], lattice, measurer_class)
         full_results[local_names[counter]] = observe_results
         measurer_class.change_hamiltonian(hamiltonian)
-        full_results[local_names[counter]]['energy'] = measurer_class.expected_value_hamiltonian()
+        full_results[local_names[counter]]['energy'] = measurer_class.expected_value_hamiltonian_selective_SV()
         counter += 1
     print("Running ZNE")
     full_results[local_names[-1]] = observes_reduced_noisy_local(results['final_paras'], lattice, measurer_class, ZNE = True)
     measurer_class.change_hamiltonian(hamiltonian)
-    full_results[local_names[-1]]['energy'] = measurer_class.ZNE_expected_value_hamiltonian(3)
-    return full_results
+    full_results[local_names[-1]]['energy'] = measurer_class.ZNE_expected_value_hamiltonian()
+    return full_results, results['final_paras']

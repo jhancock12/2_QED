@@ -247,9 +247,20 @@ class Lattice:
         return neighbors
     
     def SV_strings(self):    
-        accepted_gaus_parts = ["00", "01", "11"]
+        accepted_single_gauge_parts = {
+            2: ["00", "01", "11"],
+            3: ["000", "001", "010", "011", "101", "111", "110"]
+        }
+    
+        if self.n_g not in accepted_single_gauge_parts: raise ValueError(f"No SV gauge strings have been implemented for n_g = {self.n_g}")
+    
+        accepted_gauge_parts = []
+        for terms in itertools.product(accepted_single_gauge_parts[self.n_g], repeat = self.n_dynamical_links):
+            accepted_gauge_parts.append("".join(terms))
+    
         accepted_fermion_parts = [] 
         strings = [format(k, f'0{self.n_fermion_qubits}b') for k in range(2**self.n_fermion_qubits)]
+    
         for string in strings:
             string_charge = 0
             for site_n in range(self.n_fermion_qubits):
@@ -259,11 +270,16 @@ class Lattice:
                 else:
                     Z_value = -1
                 string_charge += -0.5 * Z_value + 0.5 * parity
+    
             if string_charge == 0:
                 accepted_fermion_parts.append(string)
+    
         accepted_strings = []
-        for gauss_string in accepted_gaus_parts:
+        for gauss_string in accepted_gauge_parts:
             for fermion_string in accepted_fermion_parts:
                 accepted_strings.append(gauss_string + fermion_string)
-            
+    
+        for state in accepted_strings:
+            if not len(state) == self.n_qubits: raise ValueError(f"SV state has length {len(state)}, but n_qubits = {self.n_qubits}")
+    
         return accepted_strings

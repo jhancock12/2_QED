@@ -4,21 +4,22 @@
 from _dont_release import full_runner
 
 # Third-party libraries
+import numpy as np
 import qiskit_aer
 
 lattice_parameters = {
-    'L_x' : 2,
+    'L_x' : 3,
     'L_y' : 2,
     'n_g' : 2,
-    'dynamical_links_list' : [((0, 0), 1)],
-    'charge_site' : (),
-    'anticharge_site' : (),
+    'dynamical_links_list' : [((0, 0), 1), ((1,0), 2)],
+    'charge_site' : (0, 0),
+    'anticharge_site' : (2, 1),
     'background_field' : [0.0, 0.0]
 }
 
 vqe_parameters = {
-    'n_fermion_layers' : 2,
-    'shots' : 10000,
+    'n_fermion_layers' : 1,
+    'shots' : 150000,
     'simulator' : qiskit_aer.AerSimulator(),
     'MEM' : False,
     'SV' : False
@@ -28,7 +29,7 @@ qed_parameters = {
     'm' : 3.0, 
     'g' : 1.0, 
     'a' : 1.0, 
-    'charge_weight' : 1000.0
+    'charge_weight' : 0.0
 }
 
 SPSA_parameters = {
@@ -42,4 +43,7 @@ SPSA_parameters = {
     'diagnostics' : False
 }
 
-full_runner(lattice_parameters, qed_parameters, vqe_parameters, SPSA_parameters)
+gs = np.linspace(0.3, 3.0, 5)
+for g in gs:
+    qed_parameters['g'] = g
+    full_runner(lattice_parameters, qed_parameters, vqe_parameters, SPSA_parameters)
