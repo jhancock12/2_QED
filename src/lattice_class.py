@@ -277,7 +277,7 @@ class Lattice:
         accepted_strings = []
         for gauss_string in accepted_gauge_parts:
             for fermion_string in accepted_fermion_parts:
-                accepted_strings.append(gauss_string + fermion_string)
+                accepted_strings.append(fermion_string + gauss_string)
     
         for state in accepted_strings:
             if not len(state) == self.n_qubits: raise ValueError(f"SV state has length {len(state)}, but n_qubits = {self.n_qubits}")

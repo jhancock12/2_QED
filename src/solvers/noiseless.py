@@ -256,5 +256,8 @@ def solve_and_observe_noiseless(hamiltonian : Hamiltonian, lattice : Lattice, vq
 
     results = SPSA_vqe_solver_noiseless(hamiltonian, lattice, vqe_parameters, SPSA_parameters)
     final_parameters = results['final_paras']
+    
+    results_2 = observes_reduced_noiseless(final_parameters, lattice, vqe_parameters)
+    results_2['energy'] = results['final_cost']
 
-    return observes_reduced_noiseless(final_parameters, hamiltonian, lattice, vqe_parameters)
+    return results_2

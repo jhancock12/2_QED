@@ -18,7 +18,7 @@ lattice_parameters = {
 }
 
 vqe_parameters = {
-    'n_fermion_layers' : 1,
+    'n_fermion_layers' : 2,
     'shots' : 150000,
     'simulator' : qiskit_aer.AerSimulator(),
     'MEM' : False,
@@ -33,7 +33,7 @@ qed_parameters = {
 }
 
 SPSA_parameters = {
-    'max_iters' : 10000,
+    'max_iters' : 40000,
     'average_length' : 5,
     'grad_tol' : 1e-12,
     'average_tol' : 1e-10,
@@ -46,4 +46,7 @@ SPSA_parameters = {
 gs = np.linspace(0.3, 3.0, 5)
 for g in gs:
     qed_parameters['g'] = g
+    print("="*10)
+    print("g =",g)
+    print("="*10)
     full_runner(lattice_parameters, qed_parameters, vqe_parameters, SPSA_parameters)
