@@ -1,4 +1,5 @@
 # Standard libraries
+from copy import copy
 
 # Local modules
 from global_helpers import smart_round
@@ -60,7 +61,7 @@ def electric_field_values_squared_from_statevector(psi_vec, lattice : Lattice):
     for site_n in range(lattice.n_fermion_qubits):
         for direction in lattice.directions[site_n]:
             H = electric_n_direction(lattice, site_n, direction)
-            H.multiply_by_hamiltonian(H)
+            H.multiply_by_hamiltonian(copy(H))
             H_sparse = H.to_sparse_matrix()
             values[(lattice.labels[site_n], direction)] = np.real(np.vdot(psi, H_sparse @ psi))
 
@@ -112,7 +113,6 @@ def observes_reduced_from_statevector(psi_vec, lattice : Lattice):
 
     gauss_equations = lattice.gauss_equations
     ef = electric_field_values_from_statevector(psi, lattice)
-    ef_sq = electric_field_values_squared_from_statevector(psi, lattice)
     mf = magnetic_field_values_from_statevector(psi, lattice)
     pn = particle_number_values_from_statevector(psi, lattice)
     c = charge_values_from_statevector(psi, lattice)
@@ -135,7 +135,7 @@ def observes_reduced_from_statevector(psi_vec, lattice : Lattice):
 
     site_n = 0
     gl = {}
-    for equation in gauss_equations['solution']:
+    for equation in gauss_equations['equations']:
         sub_ins = {}
 
         for var in gauss_equations['independant_variables'] + gauss_equations['dependant_variables']:
@@ -149,7 +149,6 @@ def observes_reduced_from_statevector(psi_vec, lattice : Lattice):
         site_n += 1
 
     ef = smart_round(ef, 6)
-    ef_sq = smart_round(ef_sq, 6)
     mf = smart_round(mf, 6)
     pn = smart_round(pn, 6)
     c = smart_round(c, 6)
@@ -160,7 +159,6 @@ def observes_reduced_from_statevector(psi_vec, lattice : Lattice):
 
     return {
         'electric_field_dict': ef,
-        'electric_field_squared_dict': ef_sq,
         'charge_field_dict': c,
         'magnetic_field_dict': mf,
         'particle_number_dict': pn,

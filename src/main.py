@@ -1,52 +1,97 @@
 # Standard libraries
 
 # Local modules
-from _dont_release import full_runner
+from hamiltonian_class import Hamiltonian
+from lattice_class import Lattice
+from solvers.sparse import sparse_statevector_solver
+from observables import qed_hamiltonian
+from operators import mass_term_n
+
+from plotter import nice_scatter_plotter
 
 # Third-party libraries
 import numpy as np
-import qiskit_aer
+import matplotlib.pyplot as plt
+
+qed_parameters = {
+    'm' : 3.0, 
+    'g' : 3.0, 
+    'a' : 1.0, 
+    'charge_weight' : 1000.0
+}
 
 lattice_parameters = {
     'L_x' : 3,
     'L_y' : 2,
     'n_g' : 2,
     'dynamical_links_list' : [((0, 0), 1), ((1,0), 2)],
-    'charge_site' : (0, 0),
-    'anticharge_site' : (2, 1),
+    'charge_site' : (),
+    'anticharge_site' : (),
     'background_field' : [0.0, 0.0]
 }
 
-vqe_parameters = {
-    'n_fermion_layers' : 2,
-    'shots' : 150000,
-    'simulator' : qiskit_aer.AerSimulator(),
-    'MEM' : False,
-    'SV' : False
-}
+lattice = Lattice(
+    L_x = lattice_parameters['L_x'],
+    L_y = lattice_parameters['L_y'],
+    n_g = lattice_parameters['n_g'],
+    dynamical_links_list = lattice_parameters['dynamical_links_list'],
+    charge_site = lattice_parameters['charge_site'],
+    anticharge_site = lattice_parameters['anticharge_site'],
+    background_field = lattice_parameters['background_field']
+)
 
-qed_parameters = {
-    'm' : 3.0, 
-    'g' : 1.0, 
-    'a' : 1.0, 
-    'charge_weight' : 0.0
-}
+chi_op_sparse = sum([mass_term_n(lattice, n).to_sparse_matrix() 
+                     for n in range(lattice.n_fermion_qubits)])
+gs = [0.3, 1.0, 3.0]
+ms = np.linspace(-5.0, 5.0, 4)
+As = [0.5, 1.0, 2.0]
 
-SPSA_parameters = {
-    'max_iters' : 40000,
-    'average_length' : 5,
-    'grad_tol' : 1e-12,
-    'average_tol' : 1e-10,
-    'a' : 0.08,
-    'c' : 0.03,
-    'prints' : False,
-    'diagnostics' : False
-}
+print("gs =", gs)
+print("ms =", ms.tolist())
 
-gs = np.linspace(0.3, 3.0, 5)
-for g in gs:
-    qed_parameters['g'] = g
+for a in As:
     print("="*10)
-    print("g =",g)
+    print("a =", a)
     print("="*10)
-    full_runner(lattice_parameters, qed_parameters, vqe_parameters, SPSA_parameters)
+
+    qed_parameters['a'] = a
+
+    Chiral_condensates = []
+
+    for g in gs: 
+        qed_parameters['g'] = g
+        chiral_condensates = []
+        for m in ms:
+            qed_parameters['m'] = m
+            hamiltonian = qed_hamiltonian(qed_parameters, lattice)
+            groundstate_energy, groundstate = sparse_statevector_solver(hamiltonian)
+            chi = np.real(np.vdot(groundstate, chi_op_sparse @ groundstate)) / lattice.n_fermion_qubits
+            chiral_condensates.append(chi)
+        Chiral_condensates.append(chiral_condensates)
+
+
+    print("ccs =", Chiral_condensates)
+
+data_x = []
+data_y = []
+data_y_err = None
+data_x_line = ms
+data_y_line = Chiral_condensates
+log_x_scale = False 
+log_y_scale = False
+
+label_x = r"$m$"
+label_y = r"$\chi$"
+label_title = ""
+labels = []
+labels_line = [r"$g = "+str(g)+r"$" for g in gs]
+same_color = True
+square = True
+
+label_save_title = "temp"
+save = True
+
+nice_scatter_plotter(data_x = data_x, data_y = data_y, data_y_errors= data_y_err, data_x_line = data_x_line, data_y_line = data_y_line,
+                     label_x = label_x, label_y = label_y, label_title = label_title, 
+                     save = save, label_save_title = label_save_title, marker = "x", labels = labels, labels_line = labels_line,
+                     log_x_scale = log_x_scale, log_y_scale = log_y_scale)

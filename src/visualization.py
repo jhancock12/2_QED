@@ -153,8 +153,8 @@ def lattice_observable_plotter(
     mid_arrow_fraction = 0.24,
     charge_gamma = 2.0,
     ring_linewidth = 2.4,
-    node_text_fontsize = 11,
-    link_text_fontsize = 12,
+    node_text_fontsize = 15,
+    link_text_fontsize = 15,
     sx = 1.6,
     sy = 1.2
 ):

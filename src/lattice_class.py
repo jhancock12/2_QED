@@ -118,6 +118,24 @@ class Lattice:
                     if (indices[0] + 1, indices[1] + 1) in indices_list:
                         plaquettes.append(key)
         return plaquettes
+    
+    def build_gray_mapping(self):
+        
+        n_states = 2 ** self.n_g
+        n_valid = 2 * self.n_g - 1
+        invalid = format(1 << (self.n_g - 1), f'0{self.n_g}b')
+
+        def gray(k):
+            return format(k ^ (k >> 1), f'0{self.n_g}b')
+
+        valid_states = [gray(k) for k in range(n_states) if gray(k) != invalid][:n_valid]
+
+        mapping = {}
+        for k in range(len(valid_states)):
+            mapping[valid_states[k]] = valid_states[(k + 1) % len(valid_states)]
+        mapping[invalid] = invalid
+
+        return mapping
 
     def gauge_terms(self):
         matrix_dict = {
@@ -127,27 +145,12 @@ class Lattice:
             'Z': np.array([[1, 0],[0, -1]], dtype = complex)
             }
 
-        mappings = {2: {
-                        "00": "01",
-                        "01": "11",
-                        "11": "00",
-                        "10": "10"
-                        },
-                    3: {
-                        "000": "001",
-                        "001": "010",
-                        "010": "011",
-                        "011": "101",
-                        "101": "111",
-                        "111": "110",
-                        "110": "000",
-                        "100": "100",
-                    }
-                    }
+        mappings = self.build_gray_mapping()
+
         U_terms = {}
         E_terms = {}
         U = np.zeros((2 ** self.n_g, 2 ** self.n_g), dtype=complex)
-        for from_, to_ in mappings[self.n_g].items():
+        for from_, to_ in mappings.items():
             i = int(from_, 2)
             j = int(to_, 2)
             U[j, i] = 1.0

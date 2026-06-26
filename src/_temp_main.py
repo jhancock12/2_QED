@@ -1,29 +1,24 @@
 # Standard libraries
-from copy import copy
 
 # Local modules
-from observables import qed_hamiltonian
-from circuits.circuit_class import CircuitForLattice
-from circuits.measurer_class import CircuitMeasurer
-from lattice_class import Lattice
-from solvers.noiseless import SPSA_vqe_solver_noiseless
+from _dont_release import full_runner
 
 # Third-party libraries
+import numpy as np
 import qiskit_aer
-from qiskit_ibm_runtime.fake_provider import FakeCairoV2
 
 lattice_parameters = {
-    'L_x' : 2,
+    'L_x' : 3,
     'L_y' : 2,
     'n_g' : 2,
-    'dynamical_links_list' : [((0, 0), 1)],
-    'charge_site' : (),
-    'anticharge_site' : (),
+    'dynamical_links_list' : [((0, 0), 1), ((1,0), 2)],
+    'charge_site' : (0, 0),
+    'anticharge_site' : (2, 1),
     'background_field' : [0.0, 0.0]
 }
 
 vqe_parameters = {
-    'n_fermion_layers' : 1,
+    'n_fermion_layers' : 2,
     'shots' : 150000,
     'simulator' : qiskit_aer.AerSimulator(),
     'MEM' : False,
@@ -38,7 +33,7 @@ qed_parameters = {
 }
 
 SPSA_parameters = {
-    'max_iters' : 10000,
+    'max_iters' : 40000,
     'average_length' : 5,
     'grad_tol' : 1e-12,
     'average_tol' : 1e-10,
@@ -48,66 +43,79 @@ SPSA_parameters = {
     'diagnostics' : False
 }
 
-lattice = Lattice(lattice_parameters['L_x'], lattice_parameters['L_y'], 
-                    lattice_parameters['n_g'], lattice_parameters['dynamical_links_list'], 
-                    lattice_parameters['charge_site'], lattice_parameters['anticharge_site'], 
-                    lattice_parameters['background_field'])
+gs = np.linspace(0.3, 3.0, 5)
+for g in gs:
+    qed_parameters['g'] = g
+    print("="*10)
+    print("g =",g)
+    print("="*10)
+    full_runner(lattice_parameters, qed_parameters, vqe_parameters, SPSA_parameters)
 
-circuit_class = CircuitForLattice(lattice, vqe_parameters['n_fermion_layers'])
-# -------------------------------
-fake_backend = FakeCairoV2()
-noisy_simulator = qiskit_aer.AerSimulator.from_backend(fake_backend)
-accepted_strings = lattice.SV_strings()
+# =====
+# Standard libraries
 
-hamiltonian = qed_hamiltonian(qed_parameters, lattice, mass_multi = 1, electric_multi = 1, magnetic_multi = 1, kinetic_multi = 1)
-results = SPSA_vqe_solver_noiseless(hamiltonian, lattice, vqe_parameters, SPSA_parameters)
+# Local modules
+from lattice_class import Lattice
+from visualization import geometry_from_lattice_scaled, lattice_geometry_plotter, lattice_observable_plotter
 
-hamiltonian_electric = qed_hamiltonian(qed_parameters, lattice, mass_multi = 0, electric_multi = 1, magnetic_multi = 0, kinetic_multi = 0)
+from data.qed_results_lists import results_no_quantum_noise, results_no_QEM, results_MEM_only, results_SV_only, results_both, results_both_ZNE, results_sparse, gs
 
-measurer_noiseless = CircuitMeasurer(circuit_class, hamiltonian, qiskit_aer.AerSimulator(), vqe_parameters['shots'])
+# Third-party libraries
+import numpy as np
 
-measurer_noisy = CircuitMeasurer(circuit_class, hamiltonian, noisy_simulator, vqe_parameters['shots'])
+lattice_parameters = {
+    'L_x' : 3,
+    'L_y' : 2,
+    'n_g' : 2,
+    'dynamical_links_list' : [((0, 0), 1), ((1,0), 2)],
+    'charge_site' : (0, 0),
+    'anticharge_site' : (2, 1),
+    'background_field' : [0.0, 0.0]
+}
 
-measurer_noisy_SV_only = CircuitMeasurer(circuit_class, hamiltonian, noisy_simulator, vqe_parameters['shots'])
-measurer_noisy_SV_only.add_SV(accepted_strings)
+parameters = {
+    'm': 3.0,
+    'g': 1.0,
+    'a': 1.0,
+    'charge_weight': 10000.0
+}
 
-measurer_noiseless.bind_values(results['final_paras'])
-measurer_noisy.bind_values(results['final_paras'])
-measurer_noisy_SV_only.bind_values(results['final_paras'])
+lattice = Lattice(
+    L_x = lattice_parameters['L_x'],
+    L_y = lattice_parameters['L_y'],
+    n_g = lattice_parameters['n_g'],
+    dynamical_links_list = lattice_parameters['dynamical_links_list'],
+    charge_site = lattice_parameters['charge_site'],
+    anticharge_site = lattice_parameters['anticharge_site'],
+    background_field = lattice_parameters['background_field']
+)
 
-print("accepted_strings:", accepted_strings)
+site_positions, link_pairs = geometry_from_lattice_scaled(lattice, sx = 1.0, sy = 1.0)
 
-measurer_noiseless.change_hamiltonian(hamiltonian)
-measurer_noisy.change_hamiltonian(hamiltonian)
-measurer_noisy_SV_only.change_hamiltonian(hamiltonian)
-energy_noiseless = measurer_noiseless.expected_value_hamiltonian_selective_SV()
-energy_noisy = measurer_noisy.expected_value_hamiltonian_selective_SV()
-energy_noisy_SV = measurer_noisy_SV_only.expected_value_hamiltonian_selective_SV()
-print("Full energies:")
-print("Noiseless:", energy_noiseless)
-print("Noisy:", energy_noisy)
-print("SV:", energy_noisy_SV)
+full_results = {"No_QEM": results_no_QEM, 
+                "MEM_only": results_MEM_only, 
+                "SV_only": results_SV_only, 
+                "MEM_SV": results_both, 
+                "MEM_SV_ZNE": results_both_ZNE, 
+                "Numerical_diagonalization": results_sparse}
 
-measurer_noiseless.change_hamiltonian(hamiltonian_electric)
-measurer_noisy.change_hamiltonian(hamiltonian_electric)
-measurer_noisy_SV_only.change_hamiltonian(hamiltonian_electric)
-electric_energy_noiseless = measurer_noiseless.expected_value_hamiltonian_selective_SV()
-electric_energy_noisy = measurer_noisy.expected_value_hamiltonian_selective_SV()
-electric_energy_noisy_SV = measurer_noisy_SV_only.expected_value_hamiltonian_selective_SV()
-print("Electric energies:")
-print("Noiseless:", electric_energy_noiseless)
-print("Noisy:", electric_energy_noisy)
-print("SV:", electric_energy_noisy_SV)
+reduced_results = {"No_QEM": results_no_QEM,
+                "MEM_SV_ZNE": results_both_ZNE, 
+                "Numerical_diagonalization": results_sparse}
 
-measurer_classes.append(copy(measurer_classes[-1]))
-    names.append(str(names[-1]) + " + ZNE")
-    for measurer_class_k in range(len(measurer_classes)):
-        for k in range(len(hamiltonians)):
-            print(f"Energy of {names[measurer_class_k]} on {hamiltonian_names[k]} Hamiltonian:")
-            measurer_classes[measurer_class_k].bind_values(final_thetas)
-            measurer_classes[measurer_class_k].change_hamiltonian(hamiltonians[k])
-            if "ZNE" in names[measurer_class_k]:
-                energy = measurer_classes[measurer_class_k].ZNE_expected_value_hamiltonian()
-            else:
-                energy = measurer_classes[measurer_class_k].expected_value_hamiltonian_selective_SV()
-            print(energy)
+for k in range(len(gs)):
+    for name in reduced_results:
+        results_dict = reduced_results[name][k]
+
+        lattice_observable_plotter(
+            lattice,
+            results_dict,
+            site_positions = site_positions,
+            link_pairs = link_pairs,
+            link_values_key = 'electric_field_dict',
+            charge_values_key = 'charge_field_dict',
+            label_title = None,
+            save = True,
+            label_save_title = name + "_" + str(k),
+            figsize = (7, 5)
+        )
