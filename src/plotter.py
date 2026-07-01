@@ -1,5 +1,4 @@
 # Standard libraries
-import copy
 from pathlib import Path
 
 # Local modules
@@ -17,9 +16,6 @@ def nice_scatter_plotter(
     log_x_scale=False, log_y_scale=False,
     same_color=False, square = False
 ):
-    import matplotlib.pyplot as plt
-    import numpy as np
-
     plt.rcParams.update({
         'font.family': 'serif',
         'font.serif': ['Times New Roman'],

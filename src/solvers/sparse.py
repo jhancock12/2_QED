@@ -20,12 +20,24 @@ def sparse_statevector_solver(hamiltonian : Hamiltonian):
     v0 = np.ones(H.shape[0], dtype = np.complex128)
     v0 = v0 / np.linalg.norm(v0)
 
-    eigenvalues, eigenvectors = eigsh(H, k=1, which='SA', v0 = v0)
+    eigenvalues, eigenvectors = eigsh(H, k = 1, which='SA', v0 = v0)
 
     groundstate_energy = eigenvalues[0].real
     groundstate = eigenvectors[:, 0]
-
     return groundstate_energy, groundstate
+
+def sparse_statevector_solver_k(hamiltonian : Hamiltonian, k_ = 1):
+    if not isinstance(hamiltonian, Hamiltonian): raise TypeError(f"The Hamiltonian must be a hamiltonian_class.Hamiltonian, you have entered a {type(hamiltonian)}")
+
+    H = hamiltonian.to_sparse_matrix()
+    H = H.astype(np.complex128)
+
+    v0 = np.ones(H.shape[0], dtype = np.complex128)
+    v0 = v0 / np.linalg.norm(v0)
+
+    eigenvalues, eigenvectors = eigsh(H, k = k_, which='SA', v0 = v0)
+
+    return eigenvalues.real, eigenvectors
 
 def _normalize_statevector(psi_vec, lattice : Lattice):
     if not isinstance(lattice, Lattice): raise TypeError(f"The lattice must be a lattice_class.Lattice, you have entered a {type(lattice)}")

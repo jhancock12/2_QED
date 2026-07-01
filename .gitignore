@@ -28,6 +28,7 @@ Thumbs.db
 plots/
 saved_plots/
 lattice_saved_plots/
+scatter_saved_plots/
 results/
 outputs/
 

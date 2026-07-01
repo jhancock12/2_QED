@@ -7,6 +7,7 @@ from global_helpers import TOL, smart_round
 # Third-party libraries
 import numpy as np
 import scipy.sparse as sp
+import scipy.sparse.linalg as spl
 
 PAULI_PHASES = {
     'I': {
@@ -176,6 +177,38 @@ class Hamiltonian:
                 temp_matrix = sp.kron(matrix_dict[pauli_term], temp_matrix, format = 'csc')
             matrix += coeff * temp_matrix
         return matrix
+        
+    def _popcount(self, integer_array):
+        return np.bitwise_count(integer_array).astype(np.int64)
+        
+    def to_linear_operator(self):
+        dimension = 2 ** self.n_qubits
+        masks = []
+        for term, coeff in self.terms.items():
+            x_mask = z_mask = y_count = 0
+            for qubit_k in range(self.n_qubits):
+                p = term[qubit_k]
+                if p == 'X': x_mask |= (1 << qubit_k)
+                elif p == 'Z': z_mask |= (1 << qubit_k)
+                elif p == 'Y':
+                    x_mask |= (1 << qubit_k); z_mask |= (1 << qubit_k); y_count += 1
+            phase = complex(coeff) * ((-1j) ** y_count)
+            masks.append((phase, x_mask, z_mask))   # tiny: 3 scalars per term
+
+        indices = np.arange(dimension, dtype=np.int64)   # one 8.6 GB array, shared
+
+        def matvec(vector):
+            vector = np.asarray(vector, dtype=np.complex128).reshape(-1)
+            result = np.zeros(dimension, dtype=np.complex128)
+            for phase, x_mask, z_mask in masks:
+                if z_mask:
+                    signs = 1 - 2 * (self._popcount(indices & z_mask) & 1)
+                    gathered = vector[indices ^ x_mask] if x_mask else vector
+                    result += (phase * signs) * gathered
+                else:
+                    result += phase * (vector[indices ^ x_mask] if x_mask else vector)
+            return result
+        return spl.LinearOperator((dimension, dimension), matvec=matvec, dtype=np.complex128)
     
     def latex_print(self, _to_print : bool = True):
         if not isinstance(_to_print, bool): raise TypeError(f"to_print is a boolean check, you have entered a {type(_to_print)}")
@@ -202,4 +235,3 @@ class Hamiltonian:
                     string_to_print += r"\\ &"
         if _to_print: print(string_to_print)
         return string_to_print
-
