@@ -65,36 +65,42 @@ class CircuitForLattice:
 
         self.circuit = qiskit.QuantumCircuit(self.lattice.n_qubits, self.lattice.n_qubits)
         self.n_slice = self.iSwap_block_calculate_qed()
-        self.thetas_per_gauge = {2: 2, 
-                                 3: 4}
+        self.thetas_per_gauge = self.gauge_calculate()
         self.n_gauge_thetas = self.thetas_per_gauge[self.lattice.n_g] * self.lattice.n_dynamical_links
         self.n_fermion_thetas = self.n_slice * self.n_fermion_layers
         self.n_total_thetas = self.n_fermion_thetas + self.n_gauge_thetas
         self.thetas = qiskit.circuit.ParameterVector('x', self.n_total_thetas)
         self.fermion_thetas = self.thetas[:self.n_fermion_thetas]
         self.gauge_thetas = self.thetas[self.n_fermion_thetas:self.n_fermion_thetas + self.n_gauge_thetas]
-        self.gauge_gates = {2: self.gauge_gate_2,
-                            3: self.gauge_gate_3}
         
         self.build_circuit()
 
-    def gauge_gate_2(self, thetas: list | np.ndarray, start_qubit):
-        if not isinstance(thetas, list) and not isinstance(thetas, np.ndarray): raise TypeError(f"The values of theta must be given as a list or np.array, you have entered a {type(thetas_slice)}")
-        
-        if not len(thetas) == 2: raise ValueError(f"Gauge gates with n_g = 2 require only 2 parameters, you entered {len(thetas)}")
+    def gauge_calculate(self):
+        last = self.lattice.n_g - 1
+        total = 0
+        for i in range(self.lattice.n_g - 1):
+            total += 1
 
-        self.circuit.ry(thetas[0], start_qubit)
-        self.circuit.cry(thetas[1], start_qubit, start_qubit+1)
-        return self
+        # last qubit is only excited via a control -> can't be 1 while all others are 0
+        p = self.lattice.n_g - 1
+        for i in range(self.lattice.n_g - 2, -1, -1):     # descending controls, matches your n=3 case
+            total += 1
+
+        return total
     
-    def gauge_gate_3(self, thetas: list | np.ndarray, start_qubit):
-        if not isinstance(thetas, list) and not isinstance(thetas, np.ndarray): raise TypeError(f"The values of theta must be given as a list or np.array, you have entered a {type(thetas_slice)}")
+    def gauge_gate(self, thetas: list | np.ndarray, start_qubit: int):
+        if not isinstance(thetas, list) and not isinstance(thetas, np.ndarray): raise TypeError(f"The values of theta must be given as a list or np.array, you have entered a {type(thetas)}")
         
         if not len(thetas) == 2: raise ValueError(f"Gauge gates with n_g = 3 require only 4 parameters, you entered {len(thetas)}")
-        self.circuit.ry(thetas[0], start_qubit)
-        self.circuit.ry(thetas[1], start_qubit+1)
-        self.circuit.cry(thetas[2], start_qubit+1, start_qubit+2)
-        self.circuit.cry(thetas[3], start_qubit, start_qubit+2)
+        last = start_qubit + self.lattice.n_g - 1
+        for i in range(self.lattice.n_g - 1):
+            self.circuit.ry(thetas[i], start_qubit + i)
+
+        p = self.lattice.n_g - 1
+        for i in range(self.lattice.n_g - 2, -1, -1):
+            self.circuit.cry(thetas[p], start_qubit + i, last)
+            p += 1
+
         return self
 
     def iSwap(self, theta, j : int, k : int):
@@ -169,8 +175,8 @@ class CircuitForLattice:
 
     def parametrize_gauge(self):       
         for j in range(int(self.lattice.n_dynamical_gauge_qubits / self.lattice.n_g)):
-            thetas = self.gauge_thetas[self.thetas_per_gauge[self.lattice.n_g] * j : self.thetas_per_gauge[self.lattice.n_g] * j + (self.thetas_per_gauge[self.lattice.n_g])]
-            self.gauge_gates[self.lattice.n_g](thetas, self.lattice.n_g*j)
+            thetas = self.gauge_thetas[self.thetas_per_gauge * j : self.thetas_per_gauge * j + (self.thetas_per_gauge)]
+            self.gauge_gate(thetas, self.lattice.n_g*j)
         self.circuit.barrier()
         return self
     

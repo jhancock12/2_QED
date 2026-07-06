@@ -33,4 +33,6 @@ results/
 outputs/
 
 # Local config files, only if they contain machine-specific paths/secrets
-# config.py
+config.py
+_dont_release.py
+_temp_main.py
