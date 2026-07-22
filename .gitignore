@@ -25,7 +25,6 @@ Thumbs.db
 *.err
 
 # Generated plots/results, if you have these folders
-data/
 plots/
 saved_plots/
 lattice_saved_plots/
@@ -35,6 +34,7 @@ results/
 outputs/
 
 # Local config files, only if they contain machine-specific paths/secrets
+main.py
 config.py
 _dont_release.py
 _temp_main.py
