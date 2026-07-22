@@ -25,10 +25,12 @@ Thumbs.db
 *.err
 
 # Generated plots/results, if you have these folders
+data/
 plots/
 saved_plots/
 lattice_saved_plots/
 scatter_saved_plots/
+scatter_saved_plots_old/
 results/
 outputs/
 

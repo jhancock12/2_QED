@@ -5,7 +5,7 @@ from copy import copy
 from global_helpers import smart_round
 from hamiltonian_class import Hamiltonian
 from lattice_class import Lattice
-from operators import electric_n_direction, magnetic_term_n, particle_n_hamiltonian, charge_n_hamiltonian
+from operators import electric_n_direction, magnetic_term_n, particle_n_hamiltonian, charge_n_hamiltonian, mass_term_n
 
 # Third-party libraries
 from scipy.sparse.linalg import eigsh
@@ -49,6 +49,20 @@ def _normalize_statevector(psi_vec, lattice : Lattice):
     if norm == 0: raise ValueError("Input statevector has zero norm.")
 
     return psi / norm
+
+def chiral_condensate_from_statevector(psi_vec, lattice : Lattice):
+    if not isinstance(lattice, Lattice): raise TypeError(f"The lattice must be a lattice_class.Lattice, you have entered a {type(lattice)}")
+
+    psi = _normalize_statevector(psi_vec, lattice)
+
+    H_sparse = sum(mass_term_n(lattice, n).to_sparse_matrix()
+                for n in range(lattice.n_fermion_qubits))
+    
+    value = np.real(np.vdot(psi, H_sparse @ psi))
+
+    value /= (lattice.n_fermion_qubits / 2)
+
+    return value
 
 def electric_field_values_from_statevector(psi_vec, lattice : Lattice):
     if not isinstance(lattice, Lattice): raise TypeError(f"The lattice must be a lattice_class.Lattice, you have entered a {type(lattice)}")
@@ -124,6 +138,7 @@ def observes_reduced_from_statevector(psi_vec, lattice : Lattice):
     psi = _normalize_statevector(psi_vec, lattice)
 
     gauss_equations = lattice.gauss_equations
+    cc = chiral_condensate_from_statevector(psi, lattice)
     ef = electric_field_values_from_statevector(psi, lattice)
     mf = magnetic_field_values_from_statevector(psi, lattice)
     pn = particle_number_values_from_statevector(psi, lattice)
@@ -160,6 +175,7 @@ def observes_reduced_from_statevector(psi_vec, lattice : Lattice):
         gl[lattice.labels[site_n]] = complex(equation.subs(sub_ins))
         site_n += 1
 
+    cc = smart_round(cc, 6)
     ef = smart_round(ef, 6)
     mf = smart_round(mf, 6)
     pn = smart_round(pn, 6)
@@ -175,6 +191,7 @@ def observes_reduced_from_statevector(psi_vec, lattice : Lattice):
         'magnetic_field_dict': mf,
         'particle_number_dict': pn,
         'gauss_law_dict': gl,
+        'chiral_condensate' : cc,
         'particle_number_total': total_pn,
         'charge_total' : total_charge
     }

@@ -119,24 +119,6 @@ class Lattice:
                         plaquettes.append(key)
         return plaquettes
     
-    def build_gray_mapping(self):
-        
-        n_states = 2 ** self.n_g
-        n_valid = 2 * self.n_g - 1
-        invalid = format(1 << (self.n_g - 1), f'0{self.n_g}b')
-
-        def gray(k):
-            return format(k ^ (k >> 1), f'0{self.n_g}b')
-
-        valid_states = [gray(k) for k in range(n_states) if gray(k) != invalid][:n_valid]
-
-        mapping = {}
-        for k in range(len(valid_states)):
-            mapping[valid_states[k]] = valid_states[(k + 1) % len(valid_states)]
-        mapping[invalid] = invalid
-
-        return mapping
-
     def gauge_terms(self):
         matrix_dict = {
             'I': np.array([[1, 0], [0, 1]], dtype = complex),
@@ -145,33 +127,54 @@ class Lattice:
             'Z': np.array([[1, 0],[0, -1]], dtype = complex)
             }
 
-        mappings = self.build_gray_mapping()
+        I_string_list = list('I' * self.n_g)
+        coeff = -0.5
+        E_terms = {}
+        for k in range(self.n_g - 1):
+            temp_string = copy.copy(I_string_list)
+            temp_string[k] = 'Z'
+            E_terms["".join(temp_string)] = coeff * 2**(k)
+
+        first_string = copy.copy(I_string_list)
+        first_string[self.n_g - 1] = 'Z'
+        E_terms["".join(first_string)] = coeff * (2**(self.n_g - 1) - 1)
+
+        dim = 2 ** self.n_g
+        diag = np.zeros(dim)
+        for term, term_coeff in E_terms.items():
+            k = term.index('Z')
+            bit = 1 << k
+            for i in range(dim):
+                diag[i] += term_coeff if not (i & bit) else -term_coeff
+
+        invalid = 1 << (self.n_g - 1)
+        valid_indices = [i for i in range(dim) if i != invalid]
+        valid_indices.sort(key = lambda i: diag[i])
+
+        mappings = {}
+        n_valid = len(valid_indices)
+        for k in range(n_valid):
+            from_ = format(valid_indices[k], f'0{self.n_g}b')
+            to_ = format(valid_indices[(k + 1) % n_valid], f'0{self.n_g}b')
+            mappings[from_] = to_
+        inv_str = format(invalid, f'0{self.n_g}b')
+        mappings[inv_str] = inv_str
 
         U_terms = {}
-        E_terms = {}
-        U = np.zeros((2 ** self.n_g, 2 ** self.n_g), dtype=complex)
+        U = np.zeros((dim, dim), dtype=complex)
         for from_, to_ in mappings.items():
             i = int(from_, 2)
             j = int(to_, 2)
             U[j, i] = 1.0
         for labels in itertools.product("IXYZ", repeat = self.n_g):
-            term = matrix_dict[labels[0]]
-            for l in labels[1:]:
-                term = np.kron(term, matrix_dict[l])
+            term = np.array([1])
+            for l in labels:
+                term = np.kron(matrix_dict[l], term)
 
-            coeff = np.trace(term.conj().T @ U) / (2 ** self.n_g)
+            coeff = np.trace(term.conj().T @ U) / dim
             if abs(coeff) > 1e-12:
                 U_terms["".join(labels)] = coeff
-        I_string_list = list('I' * self.n_g)
-        coeff = -0.5
-        for k in range(self.n_g - 1):
-            temp_string = copy.copy(I_string_list)
-            temp_string[k] = 'Z'
-            E_terms["".join(temp_string)] = coeff * 2**(k)
-            
-        first_string = copy.copy(I_string_list)    
-        first_string[self.n_g - 1] = 'Z'
-        E_terms["".join(first_string)] = coeff * (2**(self.n_g - 1) - 1)      
+
         return U_terms, E_terms
 
     def gauss_solver(self):     

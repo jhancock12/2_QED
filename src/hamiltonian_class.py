@@ -150,6 +150,27 @@ class Hamiltonian:
                     new_terms[new_term] = new_coeff
         self.terms = new_terms
 
+    def commutator(self, _other):
+        if isinstance(_other, Hamiltonian): other = _other.terms
+        elif isinstance(_other, dict): other = _other
+        else: raise TypeError(f"Can only compute a commutator with a Hamiltonian that are of type = dict or hamiltonian_class.Hamiltonian, you have entered a {type(_other)}")
+
+        new_terms = {}
+        for self_term, self_coeff in self.terms.items():
+            for other_term, other_coeff in other.items():
+                new_term, forward_phase = self.multiply_terms(self_term, other_term)
+                _, backward_phase = self.multiply_terms(other_term, self_term)
+                new_coeff = self_coeff * other_coeff * (forward_phase - backward_phase)
+                if abs(new_coeff.imag) < 1e-12:
+                    new_coeff = new_coeff.real
+                if new_coeff != 0:
+                    if new_term in new_terms:
+                        new_terms[new_term] += new_coeff
+                    else:
+                        new_terms[new_term] = new_coeff
+
+        return Hamiltonian(n_qubits = self.n_qubits, terms = new_terms if new_terms else {"I" * self.n_qubits: 0.0})
+
     def to_matrix(self):
         matrix_dict = {
             'I': np.array([[1, 0], [0, 1]], dtype = complex),

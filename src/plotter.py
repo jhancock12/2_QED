@@ -14,7 +14,7 @@ def nice_scatter_plotter(
     save=False, label_save_title="", marker="-x",
     labels=None, labels_line=None,
     log_x_scale=False, log_y_scale=False,
-    same_color=False, square = False
+    same_color=False, square = False, show = True
 ):
     plt.rcParams.update({
         'font.family': 'serif',
@@ -202,5 +202,6 @@ def nice_scatter_plotter(
     else:
         print("Plot not saved")
 
-    plt.show()
+    if show:
+        plt.show()
 
