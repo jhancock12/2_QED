@@ -37,8 +37,8 @@ Project structure
 ├── visualization.py            # Lattice field visualisation (charge, electric field)
 ├── global_helpers.py           # Utility functions (rounding, dictionary printing)
 └── generate_data.py            # Example data‑generation script (full sweep)
----
 ```
+---
 Installation & dependencies
 
 The code requires Python 3.8+ and the following libraries:
