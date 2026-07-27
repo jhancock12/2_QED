@@ -21,7 +21,7 @@ Key features
 
 ---
 Project structure
-
+```
 ├── hamiltonian_class.py        # Pauli‑string Hamiltonian builder (sparse and dense)
 ├── lattice_class.py            # Lattice geometry, Gauss‑law reduction, link management
 ├── operators.py                # Individual Hamiltonian terms (mass, kinetic, magnetic, electric)
@@ -38,7 +38,7 @@ Project structure
 ├── global_helpers.py           # Utility functions (rounding, dictionary printing)
 └── generate_data.py            # Example data‑generation script (full sweep)
 ---
-
+```
 Installation & dependencies
 
 The code requires Python 3.8+ and the following libraries:
