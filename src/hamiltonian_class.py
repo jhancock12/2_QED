@@ -231,28 +231,78 @@ class Hamiltonian:
             return result
         return spl.LinearOperator((dimension, dimension), matvec=matvec, dtype=np.complex128)
     
-    def latex_print(self, _to_print : bool = True):
-        if not isinstance(_to_print, bool): raise TypeError(f"to_print is a boolean check, you have entered a {type(_to_print)}")
+    def latex_print(self, _to_print: bool = True):
+        if not isinstance(_to_print, bool):
+            raise TypeError(f"to_print must be a boolean, got {type(_to_print)}")
+        rounded_terms = smart_round(self.terms.copy(), 5)
+        rounded_terms = {k: v for k, v in rounded_terms.items() if abs(v) > 1e-12}
+        if not rounded_terms:
+            string_to_print = "0"
+            if _to_print:
+                print(string_to_print)
+            return string_to_print
+
+        def fmt_num(x, sig=5):
+            if abs(x) < 1e-12:
+                return "0"
+            s = f"{x:.{sig}g}"
+            if '.' in s:
+                s = s.rstrip('0').rstrip('.')
+            return s
 
         string_to_print = ""
-        rounded_terms = smart_round(self.terms.copy(), 5)
-        counter  = 0
-        for term in rounded_terms:
+        counter = 0
+        for term, coeff in rounded_terms.items():
             term_list = list(term)
-            if term_list == ['I'] * len(term_list):
-                string_to_print += str(rounded_terms[term])
-            else:
-                temp_string = ""
-                for i in range(len(term_list)):
-                    if term_list[i] != 'I':
-                        temp_string += term_list[i] + r"_{" + str(i) + r"} "    
-                              
-                if rounded_terms[term] < 0:
-                    string_to_print += r" - " + str(abs(rounded_terms[term])) + " " + temp_string
+            real = coeff.real
+            imag = coeff.imag
+            temp_string = ""
+            for i, pauli in enumerate(term_list):
+                if pauli != 'I':
+                    temp_string += pauli + r"_{" + str(i) + r"} "
+            is_identity = (term_list == ['I'] * len(term_list))
+
+            if abs(real) > 1e-12 and abs(imag) > 1e-12:
+                real_str = fmt_num(real)
+                imag_str = fmt_num(abs(imag))
+                sign = '-' if imag < 0 else '+'
+                coeff_str = f"({real_str} {sign} {imag_str}i)"
+            elif abs(imag) > 1e-12:
+                imag_str = fmt_num(abs(imag))
+                if imag > 0:
+                    coeff_str = f"{imag_str} i"
                 else:
-                    string_to_print += r" + " + str(abs(rounded_terms[term])) + " " + temp_string
-                counter += 1
-                if (counter % 4) == 0:
-                    string_to_print += r"\\ &"
-        if _to_print: print(string_to_print)
+                    coeff_str = f"- {imag_str} i"
+            else:
+                coeff_str = fmt_num(real)
+
+            # Determine sign for non-identity terms
+            if abs(real) > 1e-12:
+                sign = '+' if real >= 0 else '-'
+            elif abs(imag) > 1e-12:
+                sign = '+' if imag >= 0 else '-'
+            else:
+                continue
+
+            if is_identity:
+                term_string = coeff_str
+            else:
+                if coeff_str.startswith('-'):
+                    coeff_str_no_sign = coeff_str[1:].strip()
+                elif coeff_str.startswith('+'):
+                    coeff_str_no_sign = coeff_str[1:].strip()
+                else:
+                    coeff_str_no_sign = coeff_str
+                term_string = f"{sign} {coeff_str_no_sign} {temp_string}".strip()
+
+            if string_to_print == "":
+                string_to_print = term_string
+            else:
+                string_to_print += r" " + term_string
+            counter += 1
+            if counter % 4 == 0:
+                string_to_print += r"\\ &"
+
+        if _to_print:
+            print(string_to_print)
         return string_to_print

@@ -25,6 +25,7 @@ Thumbs.db
 *.err
 
 # Generated plots/results, if you have these folders
+_bits/
 plots/
 saved_plots/
 lattice_saved_plots/
