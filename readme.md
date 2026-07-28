@@ -1,4 +1,4 @@
-Tools for studying QED in two spatial dimensions using Pauli spin variables
+# Tools for studying QED in two spatial dimensions using Pauli spin variables
 
 This repository provides a complete Python toolkit for studying (2+1)-dimensional quantum electrodynamics (QED) in the staggered fermion formulation, mapped to Pauli spin operators. The code is designed for both classical (exact diagonalisation) and quantum (variational quantum eigensolver) simulations, with a focus on Hamiltonian lattice gauge theory.
 
@@ -6,7 +6,7 @@ It was developed as part of a PhD thesis investigating the effects of a backgrou
 
 ---
 
-Key features
+## Key features
 
 - Hamiltonian builder – constructs the full (2+1)-D QED Hamiltonian from a set of physical parameters (mass, coupling, lattice spacing, static charges, background electric field) using the Kogut–Susskind formulation.
 - Flexible lattice class – supports arbitrary rectangular lattices, Gauss‑law reduction, and choice of dynamical links.
@@ -20,7 +20,7 @@ Key features
 - Plotting and visualisation – built‑in functions to visualise lattice field configurations and generate publication‑ready plots.
 
 ---
-Project structure
+## Project structure
 ```
 ├── hamiltonian_class.py        # Pauli‑string Hamiltonian builder (sparse and dense)
 ├── lattice_class.py            # Lattice geometry, Gauss‑law reduction, link management
@@ -39,7 +39,7 @@ Project structure
 └── generate_data.py            # Example data‑generation script (full sweep)
 ```
 ---
-Installation & dependencies
+## Installation & dependencies
 
 The code requires Python 3.8+ and the following libraries:
 
@@ -51,7 +51,7 @@ The code requires Python 3.8+ and the following libraries:
 
 ---
 
-Author
+## Author
 
 James Leonard Hancock
 james.leo.business@gmail.com
